@@ -14,3 +14,4 @@ set ( CMAKE_CXX_EXTENSIONS        OFF )
 # Executables
 add_executable(01a 01/01a.cpp )
 add_executable(01b 01/01b.cpp )
+add_executable(02a 02/02a.cpp )
