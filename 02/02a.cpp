@@ -52,18 +52,59 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
 
 using namespace std;
+using std::cout;
 
+enum class TerminatorType { None, CommaOrSemicolon };
+enum Color { Red = 0, Green = 1, Blue = 2};
+
+const int maximums[] { 12, 13, 14 };
 
 int main() {
+
     string line;
     int sum = 0;
+    int totalSum = 0;
 
     while (getline(cin, line)) {
+        istringstream is(line);
+
+        string dummy;
+        int    gameId;     // Game Identifier
+        int    count;      // Color Count
+        string colorName;  // Color Name
+
+        is >> dummy >> gameId >> dummy;   // Skip "Game", grab gameId, skip colon.
+
+        totalSum += gameId;
+
+        TerminatorType termType;
+        bool possible = true;
+
+        do {
+            is >> count >> colorName;
+
+            auto lastChar = colorName.back();
+
+            termType = (lastChar == ',' || lastChar == ';') ? TerminatorType::CommaOrSemicolon : TerminatorType::None;
+            if (termType != TerminatorType::None)
+                colorName.pop_back();
+            
+            Color color = (colorName == "red")   ? Color::Red
+                        : (colorName == "green") ? Color::Green
+                        : Color::Blue;
+
+            possible = count <= maximums[static_cast<int>(color)];
+
+        } while (possible && termType != TerminatorType::None);
+
+        if (possible)
+            sum += gameId;
     }
 
-    cout << sum << '\n';
+    cout << sum << " / " << totalSum << '\n';
 
     return 0;
 }
