@@ -91,7 +91,7 @@ int main() {
             termType = (lastChar == ',' || lastChar == ';') ? TerminatorType::CommaOrSemicolon : TerminatorType::None;
             if (termType != TerminatorType::None)
                 colorName.pop_back();
-            
+
             Color color = (colorName == "red")   ? Color::Red
                         : (colorName == "green") ? Color::Green
                         : Color::Blue;
@@ -105,6 +105,5 @@ int main() {
     }
 
     cout << sum << " / " << totalSum << '\n';
-
     return 0;
 }

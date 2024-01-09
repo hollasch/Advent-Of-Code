@@ -122,4 +122,5 @@ int main(int argc, char* argv[]) {
     }
 
     cout << sum << '\n';
+    return 0;
 }
