@@ -45,19 +45,139 @@
 //
 //----------------------------------------------------------------------------------------------------------------------
 
+#include <cctype>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
 
-int main() {
-    string line;
-    int sum = 0;
+int numberLength(const string& line, int column, int width) {
+    int length = 0;
+    while (column + length < width && isdigit(line[column + length]))
+        ++length;
+    return length;
+}
 
-    while (getline(cin, line)) {
+
+bool isSymbol(char c) {
+    return c != '.' && !isdigit(c);
+}
+
+
+bool symbolAdjacentLeft(const vector<string>& lines, int lineIndex, int begin, int lineCount, int width) {
+    if (begin == 0)
+        return false;
+
+    int column = begin - 1;
+
+    if (lineIndex > 0 && isSymbol(lines[lineIndex - 1][column]))
+        return true;
+
+    if (lineIndex + 1 < lineCount && isSymbol(lines[lineIndex + 1][column]))
+        return true;
+
+    return isSymbol(lines[lineIndex][column]);
+}
+
+
+bool symbolAdjacentRight(const vector<string>& lines, int lineIndex, int end, int lineCount, int width) {
+    int column = end + 1;
+
+    if (column >= width)
+        return false;
+
+    if (lineIndex > 0 && isSymbol(lines[lineIndex - 1][column]))
+        return true;
+
+    if (lineIndex + 1 < lineCount && isSymbol(lines[lineIndex + 1][column]))
+        return true;
+
+    return isSymbol(lines[lineIndex][column]);
+}
+
+
+bool symbolAdjacentTop(const vector<string>& lines, int lineIndex, int begin, int end, int lineCount, int width) {
+    --lineIndex;
+    if (lineIndex < 0)
+        return false;
+
+    for (int i = begin - 1;  i <= end + 1;  ++i) {
+        if (i < 0 || i >= width)
+            continue;
+        
+        if (isSymbol(lines[lineIndex][i]))
+            return true;
     }
 
-    cout << sum << '\n';
+    return false;
+}
+
+
+bool symbolAdjacentBottom(const vector<string>& lines, int lineIndex, int begin, int end, int lineCount, int width) {
+    ++lineIndex;
+    if (lineIndex >= lineCount)
+        return false;
+
+    for (int i = begin - 1;  i <= end + 1;  ++i) {
+        if (i < 0 || i >= width)
+            continue;
+        
+        if (isSymbol(lines[lineIndex][i]))
+            return true;
+    }
+
+    return false;
+}
+
+
+int main() {
+    vector<string> lines;
+    string line;
+    int lineNumber = 0;
+    int sum = 0;
+
+    int width = -1;
+    while (getline(cin, line)) {
+        ++lineNumber;
+        if (width == -1) {
+            width = line.length();
+        } else if (width != line.length()) {
+            cout << "Error: line length mismatch at line " << lineNumber << ".\n";
+            return 1;
+        }
+        lines.push_back(line);
+    }
+
+    int lineCount = lines.size();
+    for (int lineIndex = 0;  lineIndex < lineCount;  ++lineIndex) {
+        // cout << "\n> " << lines[lineIndex] << '\n';
+        int column = 0;
+        while (column < width) {
+            while (column < width && !isdigit(lines[lineIndex][column]))
+                ++column;
+            if (column >= width)
+                break;
+            int partNumber = atoi(lines[lineIndex].c_str() + column);
+
+            int partNumberLength = numberLength(lines[lineIndex], column, width);
+            int partNumberEnd = column + partNumberLength - 1;
+
+            if (   symbolAdjacentLeft(lines, lineIndex, column, lineCount, width)
+                || symbolAdjacentRight(lines, lineIndex, partNumberEnd, lineCount, width)
+                || symbolAdjacentTop(lines, lineIndex, column, partNumberEnd, lineCount, width)
+                || symbolAdjacentBottom(lines, lineIndex, column, partNumberEnd, lineCount, width)
+            ) {
+                sum += partNumber;
+                // cout << "! " << partNumber << '\n';
+            }
+
+            column = partNumberEnd + 1;
+        }
+        // cout << '\n';
+    }
+
+    cout << '\n' << sum << '\n';
     return 0;
 }
