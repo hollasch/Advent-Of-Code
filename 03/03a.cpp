@@ -106,7 +106,7 @@ bool symbolAdjacentTop(const vector<string>& lines, int lineIndex, int begin, in
     for (int i = begin - 1;  i <= end + 1;  ++i) {
         if (i < 0 || i >= width)
             continue;
-        
+
         if (isSymbol(lines[lineIndex][i]))
             return true;
     }
@@ -123,7 +123,7 @@ bool symbolAdjacentBottom(const vector<string>& lines, int lineIndex, int begin,
     for (int i = begin - 1;  i <= end + 1;  ++i) {
         if (i < 0 || i >= width)
             continue;
-        
+
         if (isSymbol(lines[lineIndex][i]))
             return true;
     }
