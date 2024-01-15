@@ -68,7 +68,7 @@
 // Specifically, you win copies of the scratchcards below the winning card equal to the number of
 // matches. So, if card 10 were to have 5 matching numbers, you would win one copy each of cards 11,
 // 12, 13, 14, and 15.
-
+//
 // Copies of scratchcards are scored like normal scratchcards and have the same card number as the
 // card they copied. So, if you win a copy of card 10 and it has 5 matching numbers, it would then
 // win a copy of the same cards that the original card 10 won: cards 11, 12, 13, 14, and 15. This
@@ -77,12 +77,12 @@
 //
 // This time, the above example goes differently:
 //
-//     Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
-//     Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
-//     Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1
-//     Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83
-//     Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36
-//     Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
+//     Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53  // (4 matches)                  1  copy
+//     Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19  // (2 matches)   +1             2  copies
+//     Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1  // (2 matches)   +1 +2          4  copies
+//     Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83  // (1 match)     +1 +2 +4       8  copies
+//     Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36  // (0 matches)   +1    +4 +8    14 copies
+//     Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11  //                              1  copy
 //
 //   - Card 1 has four matching numbers, so you win one copy each of the next four cards: cards 2,
 //     3, 4, and 5.
@@ -103,7 +103,6 @@
 //
 // Process all of the original and copied scratchcards until no more scratchcards are won. Including
 // the original set of scratchcards, how many total scratchcards do you end up with?
-//
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <iostream>
@@ -115,50 +114,73 @@
 
 using namespace std;
 
+struct Card {
+    int cardId;
+    unordered_set<int> winningNumbers;
+    vector<int>selectedNumbers;
+    int matchCount;
+    int copies;
+};
+
 
 int main() {
-    string line;
-    int sum = 0;
+    vector<Card> cards;
 
+    string line;
     while (getline(cin, line)) {
 
         istringstream is(line);
 
+        Card card;
         string text;
-        int    cardId;     // Card Identifier
-        int    cardValue;  // Card Value
 
-        is >> text >> cardId >> text; // Skip "Card", read cardId, skip ":"
+        is >> text >> card.cardId >> text; // Skip "Card", read cardId, skip ":"
 
         // Read in the winning numbers.
 
-        unordered_set<int> winningNumbers;
-
         while (is >> text) {
             if (text == "|") break;
-            cardValue = stoi(text);
-            winningNumbers.insert(cardValue);
+            int cardValue = stoi(text);
+            card.winningNumbers.insert(cardValue);
         }
 
         // Read in the selected numbers.
 
-        vector<int> selectedNumbers;
-
         while (is >> text) {
-            cardValue = stoi(text);
-            selectedNumbers.push_back(cardValue);
+            int cardValue = stoi(text);
+            card.selectedNumbers.push_back(cardValue);
         }
 
-        // Define the scoring function.
-
-        auto scoreFunc = [&winningNumbers](int score, int selectedValue) {
-            if (!winningNumbers.contains(selectedValue)) return score;
-            return score == 0 ? 1 : 2 * score;
-        };
-
-        sum += accumulate(selectedNumbers.begin(), selectedNumbers.end(), 0, scoreFunc);
+        card.matchCount = 0;
+        card.copies = 1;
+        cards.push_back(card);
     }
 
-    cout << sum << '\n';
+    for (int cardIndex = 0;  cardIndex < cards.size();  ++cardIndex) {
+        Card& card = cards[cardIndex];
+
+        // Count the number of winning numbers on this card.
+
+        card.matchCount = 0;
+        for (int selectedNumber : card.selectedNumbers) {
+            if (card.winningNumbers.contains(selectedNumber))
+                ++card.matchCount;
+        }
+
+        // Get an additional copy of the N subsequent cards, where N is the number of matches on
+        // this card.
+
+        for (int bonusCardIndex = cardIndex + 1;  bonusCardIndex <= cardIndex + card.matchCount;  ++bonusCardIndex)
+            cards[bonusCardIndex].copies += card.copies;
+    }
+
+    int totalCards = 0;
+    for (auto& card: cards) {
+        // cout << card.cardId << ": matchCount " << card.matchCount << ", " << card.copies << " copies.\n";
+        totalCards += card.copies;
+    }
+    // cout << '\n';
+
+    cout << totalCards << '\n';
     return 0;
 }
