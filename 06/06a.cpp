@@ -79,18 +79,84 @@
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
 
-int main() {
-    string line;
-    int sum = 0;
+struct RaceData {
+    double length;
+    double record;
+};
 
-    while (getline(cin, line)) {
+
+vector<RaceData> readRaceData() {
+    // Reads in a set of race data from stdin and returns it as a vector of RaceData.
+
+    vector<RaceData> raceData;
+    string line;
+    istringstream(iss);
+
+    // Read in the race lengths.
+
+    getline(cin, line);
+    if (!line.starts_with("Time:")) {
+        cerr << "Error: Expected 'Time:' header line.\n";
+        return {};
     }
 
-    cout << sum << '\n';
+    iss.str(line.substr(5));
+
+    for(string s; iss >> s; ) {
+        RaceData rd;
+        rd.length = stod(s);
+        rd.record = 0;
+        raceData.push_back(rd);
+    }
+
+    // Read in the race record distances.
+
+    getline(cin, line);
+    if (!line.starts_with("Distance:")) {
+        cerr << "Error: Expected 'Distance:' header line.\n";
+        return {};
+    }
+
+    iss.str(line.substr(9));
+    iss.clear();
+
+    auto rdit = raceData.begin();
+    for(string s;  iss >> s;  ++rdit)
+        rdit->record = stod(s);
+    
+    return raceData;
+}
+
+
+int main() {
+    vector<RaceData> raceData = readRaceData();
+
+    unsigned long long numWays = 1;
+
+    for (const auto& rd : raceData) {
+        cout << "Time " << rd.length << ", distance " << rd.record << "\n";
+
+        // Determine the minimum time to press the charge button to beat the record.
+        double minPress = (rd.length - sqrt(rd.length*rd.length - 4*rd.record)) / 2;
+
+        if (minPress == ceil(minPress)) // Matching the current record exactly is not enough.
+            ++minPress;
+
+        minPress = ceil(minPress);
+        double distance = minPress * (rd.length - minPress);
+        if (distance <= rd.record) continue; // No way to beat the record.
+
+        numWays *= (rd.length - 2*minPress + 1);
+    }
+
+    cout << "\nNumber of ways to beat the record: " << numWays << "\n";
+
     return 0;
 }
