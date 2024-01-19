@@ -75,7 +75,6 @@
 //
 // Determine the number of ways you could beat the record in each race. What do you get if you
 // multiply these numbers together?
-//
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <iostream>
@@ -130,7 +129,7 @@ vector<RaceData> readRaceData() {
     auto rdit = raceData.begin();
     for(string s;  iss >> s;  ++rdit)
         rdit->record = stod(s);
-    
+
     return raceData;
 }
 
