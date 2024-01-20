@@ -81,6 +81,34 @@
 // with its rank (765 * 1 + 220 * 2 + 28 * 3 + 684 * 4 + 483 * 5). So the total winnings in this example are 6440.
 //
 // Find the rank of every hand in your set. What are the total winnings?
+//
+// --- Part Two ---
+//
+// To make things a little more interesting, the Elf introduces one additional rule. Now, J cards are jokers - wildcards
+// that can act like whatever card would make the hand the strongest type possible.
+//
+// To balance this, J cards are now the weakest individual cards, weaker even than 2. The other cards stay in the same
+// order: A, K, Q, T, 9, 8, 7, 6, 5, 4, 3, 2, J.
+//
+// J cards can pretend to be whatever card is best for the purpose of determining hand type; for example, QJJQ2 is now
+// considered four of a kind. However, for the purpose of breaking ties between two hands of the same type, J is always
+// treated as J, not the card it's pretending to be: JKKK2 is weaker than QQQQ2 because J is weaker than Q.
+//
+// Now, the above example goes very differently:
+//
+//     32T3K 765
+//     T55J5 684
+//     KK677 28
+//     KTJJT 220
+//     QQQJA 483
+//
+//   - 32T3K is still the only one pair; it doesn't contain any jokers, so its strength doesn't increase.
+//   - KK677 is now the only two pair, making it the second-weakest hand.
+//   - T55J5, KTJJT, and QQQJA are now all four of a kind! T55J5 gets rank 3, QQQJA gets rank 4, and KTJJT gets rank 5.
+//
+// With the new joker rule, the total winnings in this example are 5905.
+//
+// Using the new joker rule, find the rank of every hand in your set. What are the new total winnings?
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <algorithm>
@@ -92,7 +120,7 @@
 using namespace std;
 
 const bool verbose = true;
-const int  numCards = 5;
+const int  cardsPerHand = 5;
 
 
 class Hand {
@@ -116,11 +144,11 @@ class Hand {
         score = 0;
         char c[5] {cards[0], cards[1], cards[2], cards[3], cards[4]};
 
-        for (int i = 0;  i < numCards-1;  ++i) {
+        for (int i = 0;  i < cardsPerHand-1;  ++i) {
             int dupeCount = 1;
             if (c[i] == 0)
                 continue;
-            for (int j = i+1;  j < numCards;  ++j) {
+            for (int j = i+1;  j < cardsPerHand;  ++j) {
                 if (c[i] == c[j]) {
                     ++dupeCount;
                     c[j] = 0;
@@ -165,7 +193,7 @@ bool compareHands(const Hand& h1, const Hand& h2) {
     if (h1.score != h2.score)
         return h1.score < h2.score;
 
-    for (int i = 0;  i < numCards;  ++i) {
+    for (int i = 0;  i < cardsPerHand;  ++i) {
         if (cardRank(h1.cards[i]) != cardRank(h2.cards[i]))
             return cardRank(h1.cards[i]) < cardRank(h2.cards[i]);
     }
