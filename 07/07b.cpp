@@ -123,6 +123,29 @@ const bool verbose = true;
 const int  cardsPerHand = 5;
 
 
+int promoteScore(int score, int numJokers) {
+    static struct {
+        int score;
+        int addedJokers[6];
+    } promotionTable[7] {    // Jokers:    0     1     2     3     4     5
+        { /* High Card       */    0, {    0,    1,   10,  100, 1000, 1000 } },
+        { /* One Pair        */    1, {    1,   10,  100, 1000,   -1,   -1 } },
+        { /* Two Pair        */    2, {    2,   11,   -1,   -1,   -1,   -1 } },
+        { /* Three of a Kind */   10, {   10,  100, 1000,   -1,   -1,   -1 } },
+        { /* Full House      */   11, {   11,   -1,   -1,   -1,   -1,   -1 } },
+        { /* Four of a Kind  */  100, {  100, 1000,   -1,   -1,   -1,   -1 } },
+        { /* Five of a Kind  */ 1000, { 1000,   -1,   -1,   -1,   -1,   -1 } },
+    };
+
+    for (int i=0;  i < 7;  ++i) {
+        if (promotionTable[i].score == score)
+            return promotionTable[i].addedJokers[numJokers];
+    }
+
+    return -1;
+}
+
+
 class Hand {
   public:
     Hand(string desc) {
@@ -137,12 +160,21 @@ class Hand {
         while (sit != desc.end())
             bid = 10*bid + (*sit++ - '0');
 
-        calculateRank();
+        calculateScore();
     }
 
-    void calculateRank() {
+    void calculateScore() {
         score = 0;
         char c[5] {cards[0], cards[1], cards[2], cards[3], cards[4]};
+
+        // Gather jokers
+        int numJokers = 0;
+        for (int i = 0;  i < cardsPerHand;  ++i) {
+            if (c[i] == 'J') {
+                ++numJokers;
+                c[i] = 0;
+            }
+        }
 
         for (int i = 0;  i < cardsPerHand-1;  ++i) {
             int dupeCount = 1;
@@ -169,6 +201,9 @@ class Hand {
                     break;
             }
         }
+
+        // Account for any jokers.
+        score = promoteScore(score, numJokers);
     }
 
     char cards[5];
@@ -182,7 +217,7 @@ int cardRank(char c) {
         case 'A': return 14;
         case 'K': return 13;
         case 'Q': return 12;
-        case 'J': return 11;
+        case 'J': return  0;
         case 'T': return 10;
     }
     return c - '0';
