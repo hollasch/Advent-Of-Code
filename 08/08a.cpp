@@ -47,18 +47,128 @@
 //----------------------------------------------------------------------------------------------------------------------
 
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 using namespace std;
+
+const bool verbose = false;
+
+
+class Node {
+  public:
+    string name;
+    Node* left;
+    Node* right;
+
+    Node() : name(""), left(nullptr), right(nullptr) {}
+    Node(const string_view& name) : name(name), left(this), right(this) {}
+};
+
+
+class Navigator {
+  public:
+    string route;
+    string::iterator currentStep;
+
+    Navigator(const string_view& routeString)
+      : route(routeString)
+    {
+    }
+
+    int walk(const Node& start, const Node& end) {
+        currentStep = route.begin();
+        const Node* startNode = &start;
+        const Node* endNode = &end;
+        const Node* currentNode = startNode;
+        int routeLength = 0;
+
+        while (currentNode != endNode) {
+            ++routeLength;
+            if (verbose)
+                cout << "Step " << routeLength << ": Walking from " << currentNode->name;
+            if (*currentStep == 'L') {
+                currentNode = currentNode->left;
+                if (verbose)
+                    cout << " left";
+            } else if (*currentStep == 'R') {
+                currentNode = currentNode->right;
+                if (verbose)
+                    cout << " right";
+            } else {
+                throw runtime_error("Invalid route string");
+            }
+
+            if (verbose)
+                cout << " to " << currentNode->name << '\n';
+
+            ++currentStep;
+            if (currentStep == route.end())
+                currentStep = route.begin();
+        }
+
+        return routeLength;
+    }
+};
 
 
 int main() {
     string line;
-    int sum = 0;
+
+    getline(cin, line);
+    Navigator navigator(line);
+
+    if (verbose)
+        cout << "Route string is " << navigator.route << '\n';
+
+    unordered_map<string, Node> nodes;
+
+    nodes.insert({"AAA", Node("AAA")});
+    nodes.insert({"ZZZ", Node("ZZZ")});
 
     while (getline(cin, line)) {
+
+        if (line.empty())
+            continue;
+
+        istringstream iss(line);
+
+        string token;
+        string nodeName;
+        string leftNodeName;
+        string rightNodeName;
+
+        iss >> nodeName;
+        iss >> token;    // Equal sign
+
+        iss >> token;    // Looks like "(ABCDE,"
+        leftNodeName = token.substr(1, token.size() - 2);
+
+        iss >> token;    // Looks like "ABCDE)"
+        rightNodeName = token.substr(0, token.size() - 1);
+
+        if (verbose)
+            cout << "Node " << nodeName << " has left node " << leftNodeName << " and right node " << rightNodeName << '\n';
+
+        if (!nodes.contains(nodeName))
+            nodes.insert({nodeName, Node(nodeName)});
+
+        Node& node = nodes[nodeName];
+
+        nodes.insert({leftNodeName,  Node(leftNodeName)});
+        nodes.insert({rightNodeName, Node(rightNodeName)});
+
+        node.left  = &(nodes[leftNodeName]);
+        node.right = &(nodes[rightNodeName]);
     }
 
-    cout << sum << '\n';
+    if (verbose)
+        cout << '\n';
+
+    auto routeLength = navigator.walk(nodes["AAA"], nodes["ZZZ"]);
+    cout << "\nArrived at node ZZZ with in " << routeLength << " steps.\n";
+
     return 0;
 }
