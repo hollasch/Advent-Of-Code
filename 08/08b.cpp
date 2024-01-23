@@ -99,59 +99,104 @@
 using namespace std;
 
 const bool verbose = false;
+const bool showProgress = true;
 
 
 class Node {
   public:
     string name;
-    Node* left;
-    Node* right;
+    Node* path[2];
+    bool  isEnd;
 
-    Node() : name(""), left(nullptr), right(nullptr) {}
-    Node(const string_view& name) : name(name), left(this), right(this) {}
+    Node() : name{""}, path{nullptr, nullptr}, isEnd{false} {}
+    Node(const string_view& name) : name(name), path{nullptr, nullptr} {
+        isEnd = (name.back() == 'Z');
+    }
 };
 
 
 class Navigator {
   public:
-    string route;
-    string::iterator currentStep;
+    vector<int> directions;
 
     Navigator(const string_view& routeString)
-      : route(routeString)
     {
+        for (auto c : routeString)
+            directions.push_back((c == 'R') ? 1 : 0);
     }
 
-    int walk(const Node& start, const Node& end) {
-        currentStep = route.begin();
-        const Node* startNode = &start;
-        const Node* endNode = &end;
-        const Node* currentNode = startNode;
-        int routeLength = 0;
+    uint64_t walk(unordered_map<string, Node>& nodes) {
 
-        while (currentNode != endNode) {
+        vector<const Node*> runners;
+
+        if (verbose)
+            cout << "Runners:";
+
+        for (auto & node : nodes) {
+            if (node.second.name.back() == 'A') {
+                runners.push_back(&node.second);
+                if (verbose)
+                    cout << ' ' << node.second.name;
+            }
+        }
+
+        if (verbose)
+            cout << '\n';
+
+        uint64_t routeLength = 0;
+        uint64_t progressCounter = 0;
+        auto direction = directions.begin();
+
+        while (true) {
+
             ++routeLength;
-            if (verbose)
-                cout << "Step " << routeLength << ": Walking from " << currentNode->name;
-            if (*currentStep == 'L') {
-                currentNode = currentNode->left;
-                if (verbose)
-                    cout << " left";
-            } else if (*currentStep == 'R') {
-                currentNode = currentNode->right;
-                if (verbose)
-                    cout << " right";
-            } else {
-                throw runtime_error("Invalid route string");
+
+            // if (verbose)
+            //     cout << "\nStep " << routeLength << ":\n";
+
+            if (++progressCounter >= 1'000'000'000UL) {
+                progressCounter = 0;
+                cout << "\rStep " << routeLength << ' ' << flush;
             }
 
-            if (verbose)
-                cout << " to " << currentNode->name << '\n';
+            // Advance each runner.
 
-            ++currentStep;
-            if (currentStep == route.end())
-                currentStep = route.begin();
+            auto runner = runners.begin();
+            for (;  runner != runners.end();  ++runner) {
+                auto* runnerNext = (*runner)->path[*direction];
+
+                // if (verbose) {
+                //     cout << "  " << (*runner)->name
+                //          << " --" << (*direction == 0 ? "left" : "right") << "--> "
+                //          << runnerNext->name << '\n';
+                // }
+
+                (*runner) = runnerNext;
+
+                if (!runnerNext->isEnd)
+                    break;
+            }
+
+            if (runner == runners.end())
+                break;
+
+            for (++runner;  runner < runners.end();  ++runner) {
+                const auto* runnerNext = (*runner)->path[*direction];
+
+                // if (verbose) {
+                //     cout << "  " << (*runner)->name
+                //          << " --" << (*direction == 0 ? "left" : "right") << "--> "
+                //          << runnerNext->name << '\n';
+                // }
+
+                (*runner) = runnerNext;
+            }
+
+            if (++direction == directions.end())
+                direction = directions.begin();
         }
+
+        cout << '\n';
 
         return routeLength;
     }
@@ -165,12 +210,9 @@ int main() {
     Navigator navigator(line);
 
     if (verbose)
-        cout << "Route string is " << navigator.route << '\n';
+        cout << "\nRoute string is " << line << '\n';
 
     unordered_map<string, Node> nodes;
-
-    nodes.insert({"AAA", Node("AAA")});
-    nodes.insert({"ZZZ", Node("ZZZ")});
 
     while (getline(cin, line)) {
 
@@ -207,15 +249,15 @@ int main() {
         nodes.insert({leftNodeName,  Node(leftNodeName)});
         nodes.insert({rightNodeName, Node(rightNodeName)});
 
-        node.left  = &(nodes[leftNodeName]);
-        node.right = &(nodes[rightNodeName]);
+        node.path[0] = &(nodes[leftNodeName]);
+        node.path[1] = &(nodes[rightNodeName]);
     }
 
     if (verbose)
         cout << '\n';
 
-    auto routeLength = navigator.walk(nodes["AAA"], nodes["ZZZ"]);
-    cout << "\nArrived at node ZZZ with in " << routeLength << " steps.\n";
+    auto routeLength = navigator.walk(nodes);
+    cout << "\nRoutes completed in " << routeLength << " steps.\n";
 
     return 0;
 }
