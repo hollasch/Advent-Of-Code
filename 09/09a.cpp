@@ -96,15 +96,57 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <vector>
 
 using namespace std;
 
 
+long nextInSeq(const vector<long>& seq) {
+    bool isConst = true;
+    long v = seq[0];
+
+    for (int i=1;  isConst && i < seq.size();  ++i)
+        isConst = (seq[i] == v);
+
+    if (isConst)
+        return seq[0];
+
+    vector<long> diffs;
+
+    for (auto i=1;  i <  seq.size();  ++i) {
+        long diff = seq[i] - seq[i-1];
+        diffs.push_back(diff);
+    }
+
+    const auto nextDiff = nextInSeq(diffs);
+
+    return seq.back() + nextDiff;
+}
+
+
 int main() {
     string line;
-    int sum = 0;
+    long sum = 0;
 
     while (getline(cin, line)) {
+        vector<long> seq;
+
+        istringstream iss(line);
+
+        long num;
+        while (iss >> num)
+            seq.push_back(num);
+
+        cout << "Sequence:";
+        for (auto n : seq) {
+            cout << ' ' << n;
+        }
+        cout << '\n';
+
+        const auto next = nextInSeq(seq);
+        cout << "Next in sequence: " << next << "\n\n";
+        sum += next;
     }
 
     cout << sum << '\n';
