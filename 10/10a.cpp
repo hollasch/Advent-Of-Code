@@ -128,17 +128,113 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
 
-int main() {
-    string line;
-    int sum = 0;
+using Pipe = uint8_t;
+const Pipe PipeUp    = 0x01;
+const Pipe PipeDown  = 0x02;
+const Pipe PipeLeft  = 0x04;
+const Pipe PipeRight = 0x08;
 
-    while (getline(cin, line)) {
+
+Pipe getPipeFromChar(char c) {
+    switch (c) {
+        case '|': return PipeUp   | PipeDown;
+        case '-': return PipeLeft | PipeRight;
+        case 'L': return PipeUp   | PipeRight;
+        case 'J': return PipeUp   | PipeLeft;
+        case '7': return PipeDown | PipeLeft;
+        case 'F': return PipeDown | PipeRight;
     }
 
-    cout << sum << '\n';
+    return 0;
+}
+
+
+class PipeMap {
+  public: 
+    PipeMap (const vector<string>& mapText) {
+        width = mapText[0].size();
+        height = mapText.size();
+
+        mapDataWidth = width + 2;
+        mapDataHeight = height + 2;
+
+        pipes = make_unique<Pipe>(mapDataHeight * mapDataWidth);
+
+        // Create buffer around the map data.
+
+        // TODO
+
+        // Copy map data into buffer.
+
+        for (int y = 0; y < height; ++y) {
+            const string& line = mapText[y];
+            for (int x = 0; x < width; ++x) {
+                (*this)(x, y) = getPipeFromChar(line[x]);
+            }
+        }
+    }
+
+    ~PipeMap() = default;
+
+    Pipe& operator()(int x, int y) {
+        const int rowStart = (y+1) * mapDataWidth;
+        const int colOffset = (x+1);
+        return pipes.get()[rowStart + colOffset];
+    }
+
+    const Pipe& operator()(int x, int y) const {
+        const int rowStart = (y+1) * mapDataWidth;
+        const int colOffset = (x+1);
+        return pipes.get()[rowStart + colOffset];
+    }
+
+    void dump() const {
+        for (int y = -1; y < mapDataHeight; ++y) {
+            for (int x = -1; x < mapDataWidth; ++x) {
+                const Pipe& pipe = (*this)(x, y);
+                switch (pipe) {
+                    case PipeUp    | PipeRight: cout << 'L'; break;
+                    case PipeUp    | PipeDown:  cout << '|'; break;
+                    case PipeUp    | PipeLeft:  cout << 'J'; break;
+                    case PipeRight | PipeDown:  cout << 'F'; break;
+                    case PipeRight | PipeLeft:  cout << '-'; break;
+                    case PipeDown  | PipeLeft:  cout << '7'; break;
+
+                    case 0:  cout << '.'; break;
+                    default: cout << '@'; break;
+                }
+            }
+            cout << '\n';
+        }
+    }
+
+  private:
+    int width;
+    int height;
+    int mapDataWidth;
+    int mapDataHeight;
+    unique_ptr<Pipe> pipes;
+};
+
+
+int main() {
+    vector<string> mapText;
+    string line;
+
+    while (getline(cin, line))
+        mapText.push_back(line);
+
+    for (auto& line : mapText)
+        cout << '(' << line << ")\n";
+
+    PipeMap pipeMap(mapText);
+
+    pipeMap.dump();
+
     return 0;
 }
