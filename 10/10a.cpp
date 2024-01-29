@@ -155,7 +155,6 @@ Pipe getPipeFromChar(char c) {
     return 0;
 }
 
-
 class PipeMap {
   public: 
     PipeMap (const vector<string>& mapText) {
@@ -169,7 +168,12 @@ class PipeMap {
         for (int y = 0; y < height; ++y) {
             const string& line = mapText[y];
             for (int x = 0; x < width; ++x) {
-                (*this)(x, y) = getPipeFromChar(line[x]);
+                auto p = getPipeFromChar(line[x]);
+                if (p == PipeStart) {
+                    startX = x;
+                    startY = y;
+                }
+                (*this)(x, y) = p;
             }
         }
     }
@@ -203,12 +207,109 @@ class PipeMap {
         }
     }
 
-  private:
     int width;
     int height;
+    int startX;
+    int startY;
+
+  private:
     unique_ptr<Pipe[]> pipes;
 };
 
+
+class Runner {
+  public:
+    Runner() : x(0), y(0), distance(0), direction(PipeStart) {}
+
+    void Reset(int x, int y, Pipe direction) {
+        this->x = x;
+        this->y = y;
+        this->distance = 0;
+        this->direction = direction;
+    }
+
+    void Advance(PipeMap& pipeMap) {
+        switch (direction) {
+            case PipeUp:
+                --y;
+                direction = pipeMap(x,y) & ~PipeDown;
+                break;
+            case PipeDown:
+                ++y;
+                direction = pipeMap(x,y) & ~PipeUp;
+                break;
+            case PipeLeft:
+                --x;
+                direction = pipeMap(x,y) & ~PipeRight;
+                break;
+            case PipeRight:
+                ++x;
+                direction = pipeMap(x,y) & ~PipeLeft;
+                break;
+        }
+        ++distance;
+    }
+
+    int  x;
+    int  y;
+    int  distance;
+    Pipe direction;
+};
+
+
+int maxDistanceFromStart(PipeMap& pipeMap) {
+    bool haveRunner1 = false;
+
+    Runner runner1, runner2;
+    int startX = pipeMap.startX;
+    int startY = pipeMap.startY;
+    int width = pipeMap.width;
+    int height = pipeMap.height;
+    Pipe pipe {0};
+
+    if (startY > 0 && (pipeMap(startX, startY-1) & PipeDown)) {
+        runner1.Reset(startX, startY, PipeUp);
+        haveRunner1 = true;
+    }
+
+    if (startY < pipeMap.height && (pipeMap(startX, startY+1) & PipeUp)) {
+        if (haveRunner1) {
+            runner2.Reset(startX, startY, PipeDown);
+        } else {
+            runner1.Reset(startX, startY, PipeDown);
+            haveRunner1 = true;
+        }
+    }
+
+    if (startX > 0 && (pipeMap(startX-1, startY) & PipeRight)) {
+        if (haveRunner1) {
+            runner2.Reset(startX, startY, PipeLeft);
+        } else {
+            runner1.Reset(startX, startY, PipeLeft);
+            haveRunner1 = true;
+        }
+    }
+
+    if (startX < height && (pipeMap(startX+1, startY) & PipeLeft)) {
+        if (haveRunner1) {
+            runner2.Reset(startX, startY, PipeRight);
+        } else {
+            runner1.Reset(startX, startY, PipeRight);
+            haveRunner1 = true;
+        }
+    }
+
+    while (true) {
+        runner1.Advance(pipeMap);
+        if (runner1.x == runner2.x && runner1.y == runner2.y)
+            break;
+        runner2.Advance(pipeMap);
+        if (runner1.x == runner2.x && runner1.y == runner2.y)
+            break;
+    }
+
+    return runner1.distance;
+}
 
 int main() {
     vector<string> mapText;
@@ -217,14 +318,16 @@ int main() {
     while (getline(cin, line))
         mapText.push_back(line);
 
-    for (auto& line : mapText)
-        cout << '(' << line << ")\n";
+    // for (auto& line : mapText)
+    //     cout << '(' << line << ")\n";
 
-    cout << '\n';
+    // cout << '\n';
 
     PipeMap pipeMap(mapText);
 
-    pipeMap.dump();
+    // pipeMap.dump();
+
+    cout << "Maximum distance from start: " << maxDistanceFromStart(pipeMap) << '\n';
 
     return 0;
 }
