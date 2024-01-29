@@ -239,12 +239,18 @@
 using namespace std;
 
 
+const bool verbose = true;
+
+
 using Pipe = uint8_t;
-const Pipe PipeUp    = 0x01;
-const Pipe PipeDown  = 0x02;
-const Pipe PipeLeft  = 0x04;
-const Pipe PipeRight = 0x08;
-const Pipe PipeStart = 0x80;
+const Pipe PipeUp         = 0x01;
+const Pipe PipeDown       = 0x02;
+const Pipe PipeLeft       = 0x04;
+const Pipe PipeRight      = 0x08;
+const Pipe PipeStart      = 0x80;
+const Pipe PipeJunk       = 0x40;
+const Pipe PipeInside     = 0xe0;
+const Pipe PipeOutside    = 0xf0;
 
 
 Pipe getPipeFromChar(char c) {
@@ -303,7 +309,13 @@ class PipeMap {
                     case PipeRight | PipeDown:  cout << 'F'; break;
                     case PipeRight | PipeLeft:  cout << '-'; break;
                     case PipeDown  | PipeLeft:  cout << '7'; break;
-                    case PipeStart:             cout << 'S'; break;
+
+                    case PipeStart:      cout << 'S'; break;
+                    case PipeCorner:     cout << '+'; break;
+                    case PipeHorizontal: cout << '-'; break;
+                    case PipeVertical:   cout << '|'; break;
+                    case PipeInside:     cout << 'i'; break;
+                    case PipeOutside:    cout << 'o'; break;
 
                     case 0:  cout << '.'; break;
                     default: cout << '@'; break;
@@ -363,59 +375,115 @@ class Runner {
 };
 
 
-int maxDistanceFromStart(PipeMap& pipeMap) {
-    bool haveRunner1 = false;
+Pipe getLoopMarker(Pipe pipe) {
+    if (pipe == (PipeUp | PipeDown))
+        return PipeVertical;
+    
+    if (pipe == (PipeLeft | PipeRight))
+        return PipeHorizontal;
 
-    Runner runner1, runner2;
+    if (pipe & (PipeUp | PipeDown | PipeLeft | PipeRight))
+        return PipeCorner;
+
+    return 0;
+}
+
+
+void markLoop(PipeMap& pipeMap) {
+    Runner runner;
     int startX = pipeMap.startX;
     int startY = pipeMap.startY;
-    int width = pipeMap.width;
+    int width  = pipeMap.width;
     int height = pipeMap.height;
-    Pipe pipe {0};
 
     if (startY > 0 && (pipeMap(startX, startY-1) & PipeDown)) {
-        runner1.Reset(startX, startY, PipeUp);
-        haveRunner1 = true;
+        runner.Reset(startX, startY, PipeUp);
+    } else if (startY < pipeMap.height && (pipeMap(startX, startY+1) & PipeUp)) {
+        runner.Reset(startX, startY, PipeDown);
+    } else if (startX > 0 && (pipeMap(startX-1, startY) & PipeRight)) {
+        runner.Reset(startX, startY, PipeLeft);
+    } else if (startX < height && (pipeMap(startX+1, startY) & PipeLeft)) {
+        runner.Reset(startX, startY, PipeRight);
     }
 
-    if (startY < pipeMap.height && (pipeMap(startX, startY+1) & PipeUp)) {
-        if (haveRunner1) {
-            runner2.Reset(startX, startY, PipeDown);
-        } else {
-            runner1.Reset(startX, startY, PipeDown);
-            haveRunner1 = true;
+    do {
+        Pipe &pipe = pipeMap(runner.x, runner.y);
+        if (pipe == PipeStart) {
+            pipe = 0;
+            if (runner.x > 0 && (pipeMap(runner.x-1, runner.y) & PipeRight))
+                pipe |= PipeLeft;
+            if (runner.x < width && (pipeMap(runner.x+1, runner.y) & PipeLeft))
+                pipe |= PipeRight;
+            if (runner.y > 0 && (pipeMap(runner.x, runner.y-1) & PipeDown))
+                pipe |= PipeUp;
+            if (runner.y < height && (pipeMap(runner.x, runner.y+1) & PipeUp))
+                pipe |= PipeDown;
         }
-    }
+        pipe = getLoopMarker(pipe);
 
-    if (startX > 0 && (pipeMap(startX-1, startY) & PipeRight)) {
-        if (haveRunner1) {
-            runner2.Reset(startX, startY, PipeLeft);
-        } else {
-            runner1.Reset(startX, startY, PipeLeft);
-            haveRunner1 = true;
-        }
-    }
+        // if (verbose) {
+        //     cout << '\n';
+        //     pipeMap.dump();
+        // }
 
-    if (startX < height && (pipeMap(startX+1, startY) & PipeLeft)) {
-        if (haveRunner1) {
-            runner2.Reset(startX, startY, PipeRight);
-        } else {
-            runner1.Reset(startX, startY, PipeRight);
-            haveRunner1 = true;
-        }
-    }
+        runner.Advance(pipeMap);
 
-    while (true) {
-        runner1.Advance(pipeMap);
-        if (runner1.x == runner2.x && runner1.y == runner2.y)
-            break;
-        runner2.Advance(pipeMap);
-        if (runner1.x == runner2.x && runner1.y == runner2.y)
-            break;
-    }
-
-    return runner1.distance;
+    } while (runner.x != startX || runner.y != startY);
 }
+
+
+void removeJunk(PipeMap& pipeMap) {
+    for (auto y=0;  y < pipeMap.height;  ++y) {
+        for (auto x=0;  x < pipeMap.width;  ++x) {
+            const auto pipe = pipeMap(x,y);
+            if (pipe != PipeCorner && pipe != PipeHorizontal && pipe != PipeVertical)
+                pipeMap(x,y) = 0;
+        }
+    }
+}
+
+int markInside(PipeMap& pipeMap) {
+    int insideArea = 0;
+
+    for (int y=0;  y < pipeMap.height;  ++y) {
+
+        bool inside = false;
+
+        for (int x=0;  x < pipeMap.width;  ++x) {
+            auto& pipe = pipeMap(x,y);
+
+            if (pipe == PipeVertical) {
+                inside = !inside;
+            } else if (pipe == 0) {
+                if (inside) {
+                    ++insideArea;
+                    pipe = PipeInside;
+                }
+            } else if (pipe == PipeCorner) {
+                if (y == 0 || y == pipeMap.height-1) {
+                    do {
+                        ++x;
+                    } while(x < pipeMap.width && pipeMap(x,y) != PipeCorner);
+                } else {
+                    bool cornerFromAbove = (pipeMap(x,y-1) & (PipeVertical | PipeCorner)) != 0;
+                    do {
+                        ++x;
+                    } while(x < pipeMap.width && pipeMap(x,y) != PipeCorner);
+
+                    // If the run is a horizontal jog while going vertically, then treat it as a
+                    // normal vertical edge. If it's from going up-across-down or down-across-up,
+                    // then just ignore it altogether.
+                    bool cornerFromBelow = (pipeMap(x,y+1) == (PipeVertical | PipeCorner)) != 0;
+                    if (cornerFromAbove == cornerFromBelow)
+                        inside = !inside;
+                }
+            }
+        }
+    }
+
+    return insideArea;
+}
+
 
 int main() {
     vector<string> mapText;
@@ -424,16 +492,35 @@ int main() {
     while (getline(cin, line))
         mapText.push_back(line);
 
-    // for (auto& line : mapText)
-    //     cout << '(' << line << ")\n";
-
-    // cout << '\n';
-
     PipeMap pipeMap(mapText);
+    if (verbose) {
+        cout << "\nOn Load:\n";
+        pipeMap.dump();
+    }
 
-    // pipeMap.dump();
+    if (verbose) {
+        cout << "\nMarking Loop:";
+    }
+    markLoop(pipeMap);
+    if (verbose) {
+        cout << "\nLoop Marked:\n";
+        pipeMap.dump();
+    }
 
-    cout << "Maximum distance from start: " << maxDistanceFromStart(pipeMap) << '\n';
+    removeJunk(pipeMap);
+    if (verbose) {
+        cout << "\nJunk Removed:\n";
+        pipeMap.dump();
+    }
+
+    int insideArea = markInside(pipeMap);
+    if (verbose) {
+        cout << "\nInside Marked:\n";
+        pipeMap.dump();
+        cout << '\n';
+    }
+
+    cout << "Inside area: " << insideArea << '\n';
 
     return 0;
 }
