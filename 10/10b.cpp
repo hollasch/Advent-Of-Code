@@ -239,7 +239,7 @@
 using namespace std;
 
 
-const bool verbose = true;
+const bool verbose = false;
 
 
 using Pipe = uint8_t;
@@ -247,20 +247,29 @@ const Pipe PipeUp         = 0x01;
 const Pipe PipeDown       = 0x02;
 const Pipe PipeLeft       = 0x04;
 const Pipe PipeRight      = 0x08;
+const Pipe PipeDirections = 0x0f;
+
+const Pipe PipeLoop       = 0x10;
+const Pipe PipeInside     = 0x20;
 const Pipe PipeStart      = 0x80;
-const Pipe PipeJunk       = 0x40;
-const Pipe PipeInside     = 0xe0;
-const Pipe PipeOutside    = 0xf0;
+
+const Pipe PipeUpRight    = PipeUp   | PipeRight;
+const Pipe PipeVertical   = PipeUp   | PipeDown;
+const Pipe PipeUpLeft     = PipeUp   | PipeLeft;
+const Pipe PipeDownRight  = PipeDown | PipeRight;
+const Pipe PipeHorizontal = PipeLeft | PipeRight;
+const Pipe PipeDownLeft   = PipeDown | PipeLeft;
+const Pipe PipeMatchingCorners = PipeUp | PipeDown | PipeLeft | PipeRight;
 
 
 Pipe getPipeFromChar(char c) {
     switch (c) {
-        case '|': return PipeUp   | PipeDown;
-        case '-': return PipeLeft | PipeRight;
-        case 'L': return PipeUp   | PipeRight;
-        case 'J': return PipeUp   | PipeLeft;
-        case '7': return PipeDown | PipeLeft;
-        case 'F': return PipeDown | PipeRight;
+        case '|': return PipeVertical;
+        case '-': return PipeHorizontal;
+        case 'L': return PipeUpRight;
+        case 'J': return PipeUpLeft;
+        case '7': return PipeDownLeft;
+        case 'F': return PipeDownRight;
         case 'S': return PipeStart;
     }
 
@@ -288,6 +297,8 @@ class PipeMap {
                 (*this)(x, y) = p;
             }
         }
+
+        deduceStartShape();
     }
 
     Pipe& operator()(int x, int y) {
@@ -301,24 +312,18 @@ class PipeMap {
     void dump() const {
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
-                const Pipe& pipe = (*this)(x, y);
+                const Pipe pipe = (*this)(x, y) & ~PipeLoop;
                 switch (pipe) {
-                    case PipeUp    | PipeRight: cout << 'L'; break;
-                    case PipeUp    | PipeDown:  cout << '|'; break;
-                    case PipeUp    | PipeLeft:  cout << 'J'; break;
-                    case PipeRight | PipeDown:  cout << 'F'; break;
-                    case PipeRight | PipeLeft:  cout << '-'; break;
-                    case PipeDown  | PipeLeft:  cout << '7'; break;
-
-                    case PipeStart:      cout << 'S'; break;
-                    case PipeCorner:     cout << '+'; break;
                     case PipeHorizontal: cout << '-'; break;
                     case PipeVertical:   cout << '|'; break;
+                    case PipeUpRight:    cout << 'L'; break;
+                    case PipeUpLeft:     cout << 'J'; break;
+                    case PipeDownRight:  cout << 'F'; break;
+                    case PipeDownLeft:   cout << '7'; break;
+                    case PipeStart:      cout << 'S'; break;
                     case PipeInside:     cout << 'i'; break;
-                    case PipeOutside:    cout << 'o'; break;
-
-                    case 0:  cout << '.'; break;
-                    default: cout << '@'; break;
+                    case 0:              cout << '.'; break;
+                    default:             cout << '@'; break;
                 }
             }
             cout << '\n';
@@ -331,6 +336,20 @@ class PipeMap {
     int startY;
 
   private:
+    void deduceStartShape() {
+        Pipe pipe {0};
+        if (startX > 0 && ((*this)(startX-1, startY) & PipeRight))
+            pipe |= PipeLeft;
+        if (startX < width-1 && ((*this)(startX+1, startY) & PipeLeft))
+            pipe |= PipeRight;
+        if (startY > 0 && ((*this)(startX, startY-1) & PipeDown))
+            pipe |= PipeUp;
+        if (startY < height-1 && ((*this)(startX, startY+1) & PipeUp))
+            pipe |= PipeDown;
+
+        (*this)(startX, startY) = pipe;
+    }
+
     unique_ptr<Pipe[]> pipes;
 };
 
@@ -347,24 +366,14 @@ class Runner {
     }
 
     void Advance(PipeMap& pipeMap) {
+        pipeMap(x,y) |= PipeLoop;
         switch (direction) {
-            case PipeUp:
-                --y;
-                direction = pipeMap(x,y) & ~PipeDown;
-                break;
-            case PipeDown:
-                ++y;
-                direction = pipeMap(x,y) & ~PipeUp;
-                break;
-            case PipeLeft:
-                --x;
-                direction = pipeMap(x,y) & ~PipeRight;
-                break;
-            case PipeRight:
-                ++x;
-                direction = pipeMap(x,y) & ~PipeLeft;
-                break;
+            case PipeUp:    --y;  direction = pipeMap(x,y) & ~PipeDown;   break;
+            case PipeDown:  ++y;  direction = pipeMap(x,y) & ~PipeUp;     break;
+            case PipeLeft:  --x;  direction = pipeMap(x,y) & ~PipeRight;  break;
+            case PipeRight: ++x;  direction = pipeMap(x,y) & ~PipeLeft;   break;
         }
+        direction &= ~PipeLoop;
         ++distance;
     }
 
@@ -373,20 +382,6 @@ class Runner {
     int  distance;
     Pipe direction;
 };
-
-
-Pipe getLoopMarker(Pipe pipe) {
-    if (pipe == (PipeUp | PipeDown))
-        return PipeVertical;
-    
-    if (pipe == (PipeLeft | PipeRight))
-        return PipeHorizontal;
-
-    if (pipe & (PipeUp | PipeDown | PipeLeft | PipeRight))
-        return PipeCorner;
-
-    return 0;
-}
 
 
 void markLoop(PipeMap& pipeMap) {
@@ -419,12 +414,6 @@ void markLoop(PipeMap& pipeMap) {
             if (runner.y < height && (pipeMap(runner.x, runner.y+1) & PipeUp))
                 pipe |= PipeDown;
         }
-        pipe = getLoopMarker(pipe);
-
-        // if (verbose) {
-        //     cout << '\n';
-        //     pipeMap.dump();
-        // }
 
         runner.Advance(pipeMap);
 
@@ -436,7 +425,7 @@ void removeJunk(PipeMap& pipeMap) {
     for (auto y=0;  y < pipeMap.height;  ++y) {
         for (auto x=0;  x < pipeMap.width;  ++x) {
             const auto pipe = pipeMap(x,y);
-            if (pipe != PipeCorner && pipe != PipeHorizontal && pipe != PipeVertical)
+            if ((pipe & PipeLoop) == 0)
                 pipeMap(x,y) = 0;
         }
     }
@@ -448,35 +437,35 @@ int markInside(PipeMap& pipeMap) {
     for (int y=0;  y < pipeMap.height;  ++y) {
 
         bool inside = false;
+        bool inHorizontalEdge = false;
+        Pipe horizontalEdgeCornerStart = 0;
 
         for (int x=0;  x < pipeMap.width;  ++x) {
-            auto& pipe = pipeMap(x,y);
+            auto pipe = pipeMap(x,y) & PipeDirections;
 
-            if (pipe == PipeVertical) {
+            if (inHorizontalEdge) {
+                if (pipe == PipeHorizontal) continue;
+
+                // If the run is a horizontal jog while continuing vertically, then treat it as a
+                // normal vertical edge. If it's from going up-across-down or down-across-up, then
+                // just ignore it altogether.
+
+                inHorizontalEdge = false;
+                if ((pipe | horizontalEdgeCornerStart) == PipeMatchingCorners)
+                    inside = !inside;
+
+            } else if (pipe == PipeVertical) {
                 inside = !inside;
+
             } else if (pipe == 0) {
                 if (inside) {
                     ++insideArea;
-                    pipe = PipeInside;
+                    pipeMap(x,y) = PipeInside;
                 }
-            } else if (pipe == PipeCorner) {
-                if (y == 0 || y == pipeMap.height-1) {
-                    do {
-                        ++x;
-                    } while(x < pipeMap.width && pipeMap(x,y) != PipeCorner);
-                } else {
-                    bool cornerFromAbove = (pipeMap(x,y-1) & (PipeVertical | PipeCorner)) != 0;
-                    do {
-                        ++x;
-                    } while(x < pipeMap.width && pipeMap(x,y) != PipeCorner);
 
-                    // If the run is a horizontal jog while going vertically, then treat it as a
-                    // normal vertical edge. If it's from going up-across-down or down-across-up,
-                    // then just ignore it altogether.
-                    bool cornerFromBelow = (pipeMap(x,y+1) == (PipeVertical | PipeCorner)) != 0;
-                    if (cornerFromAbove == cornerFromBelow)
-                        inside = !inside;
-                }
+            } else if (pipe == PipeUpRight || pipe == PipeDownRight) {
+                inHorizontalEdge = true;
+                horizontalEdgeCornerStart = pipe;
             }
         }
     }
