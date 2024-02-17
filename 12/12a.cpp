@@ -109,38 +109,110 @@
 
 using namespace std;
 
-const bool debug = false;
+const bool debug = true;
+
+class SpringGroup {
+  public:
+    int length;
+    int rangeStart {0};
+    int rangeEnd {0};
+
+    SpringGroup(int len) : length(len) {}
+};
 
 
 class SpringSet {
   public:
     SpringSet(string text) {
-        if (debug) cout << "\n<" << text << ">\n";
+        //if (debug) cout << "\n<" << text << ">\n";
         stringstream iss(text);
-        iss >> springs;
+        iss >> springsText;
         string numbers;
         iss >> numbers;
         while (numbers.size() > 0) {
             int n = stoi(numbers);
-            groups.push_back(n);
+            groups.push_back({n});
             auto sepPos = numbers.find(',');
             if (sepPos == string::npos)
                 break;
             numbers.erase(numbers.begin(), numbers.begin() + sepPos + 1);
         }
 
-        if (debug) {
-            cout << '(' << springs << ") ";
-            for (auto n : groups)
-                cout << n << ';';
-            cout << '\n';
+        int numGroups = groups.size();
+
+        for (int i=0;  i < numGroups;  ++i) {
+            if (i == 0)
+                groups[i].rangeStart = 0;
+            else {
+                auto& pred = groups[i-1];
+                groups[i].rangeStart = pred.length + pred.rangeStart + 1;
+            }
+        }
+
+        for (int i = numGroups - 1;  i >= 0;  --i) {
+            auto currLength = groups[i].length;
+            if (i == (numGroups - 1))
+                groups[i].rangeEnd = springsText.size() - currLength;
+            else {
+                auto& succ = groups[i+1];
+                groups[i].rangeEnd = succ.rangeEnd - currLength - 1;
+            }
         }
     }
 
-    string springs;
-    vector<int> groups;
+    string springsText;
+    vector<SpringGroup> groups;
 };
 
+
+bool isGood(const string& springsText, int pos) {
+    if (pos < 0 || pos >= springsText.size()) return true;
+    auto c = springsText[pos];
+    return (c == '?' || c == '.');
+}
+
+bool isBad(const string& springsText, int pos) {
+    if (pos < 0 || pos >= springsText.size()) return false;
+    auto c = springsText[pos];
+    return (c == '?' || c == '#');
+}
+
+bool matchRun(const string& springsText, int pos, int length) {
+    if (pos > 0 && !isGood(springsText, pos-1))
+        return false;
+    if (pos < springsText.size() - length && !isGood(springsText, pos+length))
+        return false;
+    for (int i=pos;  i < pos+length;  ++i) {
+        if (!isBad(springsText, i))
+            return false;
+    }
+    return true;
+}
+
+bool remainderGood(const string& springsText, int pos) {
+    for (int i=pos;  i < springsText.size();  ++i) {
+        if (!isGood(springsText, i))
+            return false;
+    }
+    return true;
+}
+
+uint64_t countArrangements(const SpringSet& springSet, int groupIndex, int startPos) {
+    uint64_t sumArrangements = 0;
+    auto& springGroup = springSet.groups[groupIndex];
+    auto groupLength = springGroup.length;
+    for (auto pos = startPos;  pos <= springGroup.rangeEnd;  ++pos) {
+        if (matchRun(springSet.springsText, pos, groupLength)) {
+            if (groupIndex == springSet.groups.size() - 1) {
+                if (remainderGood(springSet.springsText, pos + groupLength + 1))
+                    sumArrangements += 1;
+            } else {
+                sumArrangements += countArrangements(springSet, groupIndex + 1, pos + groupLength + 1);
+            }
+        }
+    }
+    return sumArrangements;
+}
 
 int main() {
     vector<SpringSet> springSets;
@@ -148,6 +220,27 @@ int main() {
     string line;
     while (getline(cin, line))
         springSets.push_back({line});
+
+    if (debug) {
+        for (auto& ss : springSets) {
+            cout << '(' << ss.springsText << ")\n";
+            for (auto& sg : ss.groups)
+                cout << "  (" << sg.length << ") " << sg.rangeStart << '-' << sg.rangeEnd << '\n';
+            cout << "  Num Arrangements: " << countArrangements(ss, 0, 0) << '\n';
+            cout << '\n';
+        }
+    }
+
+    uint64_t totalArrangements = 0;
+    for (auto& springSet : springSets) {
+        auto numArrangements = countArrangements(springSet, 0, 0);
+        if (debug) {
+            cout << "Number Arrangements: " << numArrangements << " (" << springSet.springsText << ")\n";
+        }
+        totalArrangements += numArrangements;
+    }
+
+    cout << "Total arrangements: " << totalArrangements << '\n';
 
     return 0;
 }
